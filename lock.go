@@ -48,8 +48,9 @@ func hashNum(str string) uint16 {
 
 // IRedisClient Redis client interface.
 type IRedisClient interface {
-	RunCmd()
-	Set()
+	RunExtendCmd(script, key, lockID string, expiration time.Duration) (err error, success bool)
+	RunUnlockCmd(script, key, lockID string) (err error, success bool)
+	SetNX(key, lockID string, expiration time.Duration) (err error, success bool)
 }
 
 // ILockFactory A lock factory interface.
@@ -78,9 +79,9 @@ type ILock interface {
 	// Realease release lock if lock id is matched.
 	Release(ctx context.Context)
 	// TryLock try to lock resource once.
-	TryLock(ctx context.Context)
+	TryLock(ctx context.Context) (err error, success bool)
 	// Extend extend lock time.
-	Extend(ctx context.Context)
+	Extend(ctx context.Context) (err error, success bool)
 	// Get lock left seconds.
 	TTL(ctx context.Context)
 }
@@ -92,7 +93,7 @@ func NewLockFactory(ctx context.Context, redisClient IRedisClient, options *Fact
 	}
 	lockPool := &sync.Pool{
 		New: func() interface{} {
-			return &Lock{
+			return &lock{
 				redisClient: redisClient,
 			}
 		},
@@ -110,32 +111,34 @@ func NewLockFactory(ctx context.Context, redisClient IRedisClient, options *Fact
 
 // GetLock Lock instance.
 func (factory *lockFactory) GetLock(ctx context.Context, resourceID string) (ILock, error) {
-	lock := factory.lockPool.Get().(*Lock)
+	lock := factory.lockPool.Get().(*lock)
 	lock.id = factory.idGen()
 	return lock, nil
 }
 
-type Lock struct {
+type lock struct {
 	redisClient IRedisClient
+	resourceID  string
 	id          string
+	expiration  time.Duration
 }
 
-func (lock *Lock) Lock(ctx context.Context) {
-
-}
-
-func (lock *Lock) Release(ctx context.Context) {
+func (l *lock) Lock(ctx context.Context) {
 
 }
 
-func (lock *Lock) TryLock(ctx context.Context) {
+func (l *lock) Release(ctx context.Context) {
 
 }
 
-func (lock *Lock) Extend(ctx context.Context) {
-
+func (l *lock) TryLock(ctx context.Context) (err error, success bool) {
+	return l.redisClient.SetNX(l.resourceID, l.id, l.expiration)
 }
 
-func (lock *Lock) TTL(ctx context.Context) {
+func (l *lock) Extend(ctx context.Context) (err error, success bool) {
+	return nil, false
+}
+
+func (l *lock) TTL(ctx context.Context) {
 
 }
